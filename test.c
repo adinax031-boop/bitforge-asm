@@ -33,10 +33,20 @@ int main(void) {
         for (size_t i=0;i<520;i++) { a[i]=UINT64_C(1)<<bit; b[i]=(i&1)?a[i]:~a[i]; }
         for (size_t n=0;n<=128;n++) check(a,b,n);
     }
+    /* All pairs of bit positions, including non-intersecting single bits. */
+    for (size_t i=0;i<64;i++) for (size_t j=0;j<64;j++) {
+        uint64_t x=UINT64_C(1)<<i, y=UINT64_C(1)<<j;
+        check(&x,&y,1);
+    }
     size_t page=(size_t)sysconf(_SC_PAGESIZE);
     char *m=mmap(NULL,page*4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
     assert(m!=MAP_FAILED); assert(!mprotect(m+page,page,PROT_NONE)); assert(!mprotect(m+3*page,page,PROT_NONE));
     for(size_t n=0;n<=64;n++) { uint64_t *x=(uint64_t *)(m+page-n*8), *y=(uint64_t *)(m+3*page-n*8); for(size_t i=0;i<n;i++){x[i]=rnd();y[i]=rnd();} check(x,y,n); }
     munmap(m,page*4);
+    /* A leading guard catches underreads independently of the end guard. */
+    m=mmap(NULL,page*4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+    assert(m!=MAP_FAILED); assert(!mprotect(m,page,PROT_NONE)); assert(!mprotect(m+2*page,page,PROT_NONE));
+    for(size_t n=0;n<=64;n++) { uint64_t *x=(uint64_t *)(m+page), *y=(uint64_t *)(m+3*page); for(size_t i=0;i<n;i++){x[i]=rnd();y[i]=rnd();} check(x,y,n); }
+    assert(!munmap(m,page*4));
     printf("PASS: randomized differential, tails, aliasing, guard pages, concurrent initialization; dispatch=%s\n",bf_backend());
 }
