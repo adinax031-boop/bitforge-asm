@@ -10,7 +10,9 @@
 static uint64_t state=0x123456789abcdefULL;
 static uint64_t rnd(void) { state^=state<<13; state^=state>>7; state^=state<<17; return state; }
 static void check(const uint64_t *a,const uint64_t *b,size_t n) {
-    uint64_t expected=bf_intersect_count_scalar(a,b,n);
+    uint64_t expected=0;
+    for (size_t i=0;i<n;i++) expected += (uint64_t)__builtin_popcountll(a[i]&b[i]);
+    assert(bf_intersect_count_scalar(a,b,n)==expected);
     assert(bf_intersect_count(a,b,n)==expected);
     if (__builtin_cpu_supports("popcnt")) assert(bf_intersect_count_popcnt(a,b,n)==expected);
     if (__builtin_cpu_supports("avx2")) assert(bf_intersect_count_avx2(a,b,n)==expected);
@@ -27,6 +29,10 @@ int main(void) {
     }
     memset(a,255,sizeof a);memset(b,255,sizeof b);
     for(size_t n=0;n<520;n++) check(a,b,n);
+    for (size_t bit=0;bit<64;bit++) {
+        for (size_t i=0;i<520;i++) { a[i]=UINT64_C(1)<<bit; b[i]=(i&1)?a[i]:~a[i]; }
+        for (size_t n=0;n<=128;n++) check(a,b,n);
+    }
     size_t page=(size_t)sysconf(_SC_PAGESIZE);
     char *m=mmap(NULL,page*4,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
     assert(m!=MAP_FAILED); assert(!mprotect(m+page,page,PROT_NONE)); assert(!mprotect(m+3*page,page,PROT_NONE));
